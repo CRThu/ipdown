@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """深信服AC Portal自动认证 - 简化版"""
 
+import argparse
 import json
 import os
+import re
+import subprocess
 import sys
 import time
 import httpx
@@ -107,7 +110,25 @@ def auth_ip(ip: str, username: str, password: str):
         return ok
 
 
+def detect_ips() -> list[str]:
+    """自动检测本机所有 IPv4 地址（排除 loopback）"""
+    try:
+        out = subprocess.check_output(
+            ["powershell", "-Command",
+             "Get-NetIPAddress -AddressFamily IPv4 | Select-Object -ExpandProperty IPAddress"],
+            text=True, stderr=subprocess.DEVNULL,
+        )
+        ips = re.findall(r"\d+\.\d+\.\d+\.\d+", out)
+        return [ip for ip in ips if not ip.startswith("127.")]
+    except Exception:
+        return []
+
+
 def main():
+    parser = argparse.ArgumentParser(description="深信服AC Portal自动认证")
+    parser.add_argument("-i", "--ips", help="指定IP，逗号分隔（默认自动检测）")
+    args = parser.parse_args()
+
     env = load_env()
     username = env.get("SANGFOR_USER", "")
     password = env.get("SANGFOR_PASS", "")
@@ -117,8 +138,16 @@ def main():
         print(f"Edit {ENV_FILE} or set env vars")
         sys.exit(1)
 
-    # 目标IP
-    ips = ["192.168.132.118", "192.168.132.200"]
+    if args.ips:
+        ips = [ip.strip() for ip in args.ips.split(",") if ip.strip()]
+    else:
+        ips = detect_ips()
+
+    if not ips:
+        print("Error: No IPs detected")
+        sys.exit(1)
+
+    print(f"IPs: {', '.join(ips)}")
     for ip in ips:
         auth_ip(ip, username, password)
 

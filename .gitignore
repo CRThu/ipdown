@@ -4,3 +4,4 @@ __pycache__/
 *.pyo
 .env
 logic.js
+.dl_*/
