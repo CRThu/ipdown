@@ -15,8 +15,7 @@ Options:
   -t, --timeout <s>         Connect timeout in seconds (default: 30)
   -T, --total-timeout <s>   Total timeout per part in seconds (default: 600)
   -r, --retries <n>         Max retries per part (default: 3)
-  --proxy <host:port>       HTTP proxy (default: system proxy on Windows)
-  --no-proxy                Disable system proxy, connect directly
+  --proxy <host:port>       HTTP proxy
   --insecure, -k            Skip certificate verification
   -h, --help                Show this help
 
@@ -25,7 +24,6 @@ Features:
   - Bind download to specific source IPs via socket
   - Adapter-aware: auto-detect default adapter or specify by name
   - Resume interrupted downloads (manifest-based)
-  - Auto-detect Windows system proxy from registry
   - Auto-retry on failure
   - Progress bar with speed display
 """
@@ -47,49 +45,6 @@ import time
 import urllib.parse
 
 
-def get_system_proxy() -> str | None:
-    """Read proxy from Windows registry (Internet Options)."""
-    # 1. Windows registry (Internet Settings)
-    if platform.system() == "Windows":
-        try:
-            import winreg
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Internet Settings",
-            )
-            enable, _ = winreg.QueryValueEx(key, "ProxyEnable")
-            if enable:
-                server, _ = winreg.QueryValueEx(key, "ProxyServer")
-                winreg.CloseKey(key)
-                if server:
-                    result = _parse_win_proxy(server)
-                    if result:
-                        return result
-            else:
-                winreg.CloseKey(key)
-        except Exception:
-            pass
-
-    return None
-
-
-def _parse_win_proxy(raw: str) -> str | None:
-    """Parse Windows ProxyServer value: 'http=h:p;https=h:p' or 'h:p'."""
-    proxy_map = {}
-    for part in raw.replace(";", ",").split(","):
-        part = part.strip()
-        if "=" in part:
-            scheme, addr = part.split("=", 1)
-            proxy_map[scheme.strip().lower()] = addr.strip()
-        else:
-            proxy_map["bare"] = part
-    for key in ("https", "http", "bare"):
-        if key in proxy_map and proxy_map[key]:
-            addr = proxy_map[key]
-            return addr if ":" in addr else f"{addr}:80"
-    return None
-
-
 class SourceIPTransport:
     """HTTP transport that binds to a specific source IP, with optional proxy."""
 
@@ -107,11 +62,11 @@ class SourceIPTransport:
     def _connect(self, host: str, port: int) -> socket.socket:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(self.timeout)
-        sock.bind((self.source_ip, 0))
         if self.proxy:
             proxy_host, proxy_port = self.proxy.rsplit(":", 1)
             sock.connect((proxy_host, int(proxy_port)))
         else:
+            sock.bind((self.source_ip, 0))
             sock.connect((host, port))
         return sock
 
@@ -489,8 +444,7 @@ def main():
     parser.add_argument("-t", "--timeout", type=int, default=30, help="Connect timeout (seconds)")
     parser.add_argument("-T", "--total-timeout", type=int, default=600, help="Total timeout per part (seconds)")
     parser.add_argument("-r", "--retries", type=int, default=3, help="Max retries per part")
-    parser.add_argument("--proxy", help="HTTP proxy host:port (default: system proxy on Windows)")
-    parser.add_argument("--no-proxy", action="store_true", help="Disable system proxy")
+    parser.add_argument("--proxy", help="HTTP proxy host:port")
     parser.add_argument("-k", "--insecure", action="store_true", help="Skip certificate verification")
     parser.add_argument("-h", "--help", action="store_true", help="Show help")
 
@@ -500,13 +454,8 @@ def main():
         print(__doc__)
         return
 
-    # --- Proxy: --proxy > --no-proxy > system proxy > direct ---
-    if args.proxy:
-        proxy = args.proxy
-    elif args.no_proxy:
-        proxy = None
-    else:
-        proxy = get_system_proxy()
+    # --- Proxy: --proxy > direct (default) ---
+    proxy = args.proxy
 
     # --- Resolve IPs ---
     ips = []
@@ -535,8 +484,7 @@ def main():
     print(f"Adapter: {adapter_label}")
     print(f"IPs:    {', '.join(ips)}")
     if proxy:
-        source = " (system)" if not args.proxy else ""
-        print(f"Proxy:  {proxy}{source}")
+        print(f"Proxy:  {proxy}")
     else:
         print("Proxy:  (direct)")
 
