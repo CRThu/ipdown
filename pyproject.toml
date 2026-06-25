@@ -1,0 +1,10 @@
+[project]
+name = "sangfor-auth"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx",
+]
+
+[project.scripts]
+sangfor = "sangfor_auth:main"
