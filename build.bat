@@ -10,8 +10,9 @@ echo.
 if not exist dist mkdir dist
 
 echo [1/2] Building ipdown.exe ...
-uv run --python 3.13 -m nuitka ^
+uv run -m nuitka ^
     --onefile ^
+    --onefile-no-compression ^
     --standalone ^
     --output-dir=dist ^
     --output-filename=ipdown.exe ^
@@ -30,17 +31,13 @@ echo [OK] ipdown.exe
 echo.
 
 echo [2/2] Building sangfor_auth.exe ...
-uv run --python 3.13 -m nuitka ^
+uv run -m nuitka ^
     --onefile ^
+    --onefile-no-compression ^
     --standalone ^
     --output-dir=dist ^
     --output-filename=sangfor_auth.exe ^
     --assume-yes-for-downloads ^
-    --include-package=httpx ^
-    --include-package=anyio ^
-    --include-package=sniffio ^
-    --include-package=certifi ^
-    --include-package=httpcore ^
     --company-name="MiMoCode" ^
     --product-name="Sangfor Auth" ^
     --product-version="1.0.0" ^

@@ -11,7 +11,7 @@ import time
 import httpx
 from pathlib import Path
 
-ENV_FILE = Path(__file__).parent / ".env"
+ENV_FILE = Path.cwd() / ".env"
 
 
 def load_env():
