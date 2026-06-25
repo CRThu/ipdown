@@ -5,3 +5,7 @@ __pycache__/
 .env
 logic.js
 .dl_*/
+dist/
+build/
+*.exe
+uv.lock
